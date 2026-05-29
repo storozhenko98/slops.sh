@@ -1,14 +1,39 @@
 import { CopyCommand } from "./copy-command";
 
 const leaderboard = [
-  ["alice", "12,400"],
-  ["you", "7,900"],
-  ["max", "6,660"],
+  ["claude-ate-prod", "88,888"],
+  ["you", "42,069"],
+  ["cursor-divorce", "31,337"],
+];
+
+const chaosPills = [
+  "agent is still thinking",
+  "SPACEBAR liquidity event",
+  "context window sweating",
+  "fake coin trench run",
+  "ship button haunted",
+  "no cash, all voltage",
+];
+
+const flyingLoot = ["$", "777", "AI", "BUG", "PR", "TOK", "SHIP", "HAL", "{}", "LGTM"];
+
+const terminalNoise = [
+  "[DGEN] claude opened a slot-shaped pull request",
+  "npm audit found 69 imaginary jackpots",
+  "context window is doing cardio in fake gold",
 ];
 
 export default function Home() {
   return (
     <div className="shell">
+      <div className="page-noise" aria-hidden="true">
+        {flyingLoot.map((item, index) => (
+          <span className={`loot loot-${index}`} key={`${item}-${index}`}>
+            {item}
+          </span>
+        ))}
+      </div>
+
       <header className="nav">
         <a className="brand" href="/">
           slops.sh
@@ -22,12 +47,17 @@ export default function Home() {
       <main className="main">
         <section className="hero">
           <div>
-            <div className="eyebrow">spin while your agent thinks</div>
+            <div className="eyebrow">spin while your agent lies about being almost done</div>
             <h1>slops</h1>
             <p className="lead">
-              A cursed terminal slot machine for the dead air between
-              &quot;planning edits&quot; and &quot;applying patch&quot;.
+              A fake-coin terminal slot machine for the command-tab generation:
+              yell at an agent, smash SPACE, watch imaginary numbers do crimes.
             </p>
+            <div className="chaos-strip" aria-label="Slops energy">
+              {chaosPills.map((pill) => (
+                <span key={pill}>{pill}</span>
+              ))}
+            </div>
             <div className="commands" aria-label="Install commands">
               <CopyCommand
                 command="curl -fsSL https://slops.sh/install.sh | bash"
@@ -42,13 +72,22 @@ export default function Home() {
             </div>
           </div>
 
-          <aside className="terminal" aria-label="Slopsino preview">
+          <aside className="terminal" aria-label="Slops preview">
             <div className="terminal-bar">
               <span className="dot" />
               <span className="dot" />
               <span className="dot" />
+              <span className="terminal-title">slops --panic-casino</span>
             </div>
             <div className="tui">
+              <div className="terminal-rain" aria-hidden="true">
+                {flyingLoot.slice(0, 8).map((item, index) => (
+                  <span className={`terminal-loot terminal-loot-${index}`} key={`terminal-${item}`}>
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <div className="terminal-siren">AGENTIC SLOT ROOM // SPACEBAR PANIC</div>
               <div className="stats">
                 <div className="stat">
                   <span className="stat-label">balance</span>
@@ -65,13 +104,13 @@ export default function Home() {
               </div>
               <div className="reels">
                 <div className="reel">BUG</div>
-                <div className="reel">7</div>
-                <div className="reel">AI</div>
+                <div className="reel">777</div>
+                <div className="reel">SHIP</div>
               </div>
               <div className="ticker">
-                [DGEN] npm audit found forbidden soup
-                <br />
-                ~-_-~^ -_- ^~-_- ^~-_- ^~-_
+                {terminalNoise.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
               </div>
               <div>
                 {leaderboard.map(([name, score]) => (
@@ -85,26 +124,26 @@ export default function Home() {
           </aside>
         </section>
 
-        <section className="section grid" aria-label="Product details">
+        <section className="section grid" aria-label="Slops details">
           <div className="feature">
-            <h2>Server-side spins</h2>
+            <h2>Smash space</h2>
             <p>
-              The client only asks to spin. Vercel API routes decide symbols,
-              payouts, balances, and leaderboard state.
+              Start with fake coins, chase a stupid peak, screenshot the run
+              before it faceplants.
             </p>
           </div>
           <div className="feature">
             <h2>Fake coins only</h2>
             <p>
               No cash value, deposits, withdrawals, crypto, prizes, or pretend
-              financial upside.
+              financial upside. Just terminal confetti and leaderboard shame.
             </p>
           </div>
           <div className="feature">
-            <h2>OpenTUI native</h2>
+            <h2>Agent waiting room</h2>
             <p>
-              Built with OpenTUI React so the terminal can feel animated without
-              turning into a browser tab.
+              For the dead air between planning edits, applying patches, tests
+              passing, and one more small change.
             </p>
           </div>
         </section>

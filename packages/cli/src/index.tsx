@@ -71,19 +71,21 @@ const DEFAULT_API_URL = "https://slops.sh";
 const spinnerLabels = SYMBOLS.map((symbol) => symbol.label);
 const AGENT_TICKER_FRAME_INTERVAL = 12;
 const theme = {
-  bg: "#101418",
-  panel: "#161b20",
-  border: "#3c4038",
-  borderDim: "#2b302b",
-  text: "#f6f0df",
-  muted: "#a7a091",
-  dim: "#5f5a50",
-  green: "#73f0a1",
-  gold: "#ffd166",
-  cyan: "#63d7ff",
-  danger: "#ff6b7a",
+  bg: "#07080f",
+  panel: "#111722",
+  panelHot: "#150e22",
+  border: "#6d5dfc",
+  borderDim: "#273142",
+  text: "#fbf7ed",
+  muted: "#b8adbd",
+  dim: "#615a66",
+  green: "#45ff9a",
+  gold: "#ffe45e",
+  cyan: "#34e7ff",
+  danger: "#ff3d81",
+  orange: "#ff8a24",
+  purple: "#a872ff",
 };
-const reelPalette = [theme.green, theme.gold, theme.cyan];
 const derangedPalette = [
   "#ff3355",
   "#ff7a18",
@@ -93,10 +95,26 @@ const derangedPalette = [
   "#b388ff",
   "#ff5ea8",
 ];
-const coinPalette = [theme.gold, theme.green, theme.cyan, theme.danger];
+const reelPalette = [
+  theme.green,
+  theme.gold,
+  theme.cyan,
+  theme.danger,
+  theme.orange,
+  theme.purple,
+];
+const reelBackdrops = ["#090d13", "#110a1a", "#07131a", "#171006", "#130711", "#08140d"];
+const coinPalette = [
+  theme.gold,
+  theme.green,
+  theme.cyan,
+  theme.danger,
+  theme.orange,
+  theme.purple,
+];
 const DERANGED_TICKER_INTERVAL = 4;
-const COIN_FLYBY_PERIOD = 43;
-const COIN_FLYBY_DURATION = 15;
+const COIN_FLYBY_PERIOD = 31;
+const COIN_FLYBY_DURATION = 30;
 const LEADERBOARD_REFRESH_INTERVAL_MS = 7_000;
 const normalTickerPhrases = TICKER_PHRASES.filter((phrase) => !phrase.deranged);
 const derangedTickerPhrases = TICKER_PHRASES.filter((phrase) => phrase.deranged);
@@ -848,7 +866,7 @@ function GameScreen({
   if (view === "help") {
     return (
       <box flexDirection="column" padding={1} gap={1} flexGrow={1} backgroundColor={theme.bg}>
-        <Header subtitle={`${session.user?.username ?? "you"} · help`} />
+        <Header frame={frame} subtitle={`${session.user?.username ?? "you"} · help`} />
         <GameHelp />
       </box>
     );
@@ -857,7 +875,7 @@ function GameScreen({
   if (view === "addFriend") {
     return (
       <box flexDirection="column" padding={1} gap={1} flexGrow={1} backgroundColor={theme.bg}>
-        <Header subtitle={`${session.user?.username ?? "you"} · add friend`} />
+        <Header frame={frame} subtitle={`${session.user?.username ?? "you"} · add friend`} />
         <AddFriendView username={friendInput} />
       </box>
     );
@@ -866,7 +884,7 @@ function GameScreen({
   if (view === "leaderboard") {
     return (
       <box flexDirection="column" padding={1} gap={1} flexGrow={1} backgroundColor={theme.bg} overflow="hidden">
-        <Header subtitle={`${boardScope} leaderboard · l global · v switch · ESC back`} />
+        <Header frame={frame} subtitle={`${boardScope} leaderboard · l global · v switch · ESC back`} />
         <LeaderboardView
           scope={boardScope}
           rows={visibleLeaderboard.map((entry) => formatLeaderboardEntry(entry, friendIds))}
@@ -890,7 +908,7 @@ function GameScreen({
         backgroundColor={theme.bg}
         overflow="hidden"
       >
-        <Header subtitle={`${session.user?.username ?? "you"} · fake coins`} />
+        <Header frame={frame} subtitle={`${session.user?.username ?? "you"} · fake coins`} />
         <text
           fg={theme.green}
           attributes={TextAttributes.BOLD}
@@ -904,8 +922,8 @@ function GameScreen({
         />
         <box
           border
-          borderColor={spinning ? reelPalette[frame % reelPalette.length] : theme.gold}
-          backgroundColor={theme.panel}
+          borderColor={reelPalette[frame % reelPalette.length] ?? theme.gold}
+          backgroundColor={reelBackdrops[frame % reelBackdrops.length] ?? theme.panel}
           height={7}
           padding={1}
           flexDirection="column"
@@ -914,7 +932,7 @@ function GameScreen({
           overflow="hidden"
         >
           <text
-            fg={spinning ? reelPalette[frame % reelPalette.length] : theme.gold}
+            fg={reelPalette[(frame + 1) % reelPalette.length] ?? theme.gold}
             attributes={TextAttributes.BOLD}
             height={1}
             flexShrink={0}
@@ -956,6 +974,7 @@ function GameScreen({
       overflow="hidden"
     >
       <Header
+        frame={frame}
         subtitle={`${session.user?.username ?? "you"} · fake coins · h help`}
       />
 
@@ -976,8 +995,8 @@ function GameScreen({
 
       <box
         border
-        borderColor={spinning ? reelPalette[frame % reelPalette.length] : theme.border}
-        backgroundColor={theme.panel}
+        borderColor={reelPalette[frame % reelPalette.length] ?? theme.border}
+        backgroundColor={reelBackdrops[Math.floor(frame / 2) % reelBackdrops.length] ?? theme.panel}
         height={slotHeight}
         padding={1}
         gap={0}
@@ -988,16 +1007,16 @@ function GameScreen({
         overflow="hidden"
       >
         <text
-          fg={spinning ? reelPalette[frame % reelPalette.length] : theme.muted}
+          fg={reelPalette[(frame + 2) % reelPalette.length] ?? theme.muted}
           height={1}
           flexShrink={0}
-          content={centerLine(spinning ? scanline(frame) : "SLOPS // SERVER-SIDE RNG", messageWidth)}
+          content={centerLine(scanline(frame), messageWidth)}
           truncate
         />
         <CoinFlyby
           frame={frame}
           lineWidth={messageWidth}
-          intense={spinning || status.deranged === true}
+          intense={spinning || status.deranged === true || frame % 3 === 0}
         />
 
         <box
@@ -1044,6 +1063,7 @@ function GameScreen({
             rows={panelRows}
             lineWidth={detailLineWidth}
             title={boardScope === "global" ? "GLOBAL BEST" : "FRIENDS"}
+            frame={frame}
           />
         </box>
       ) : null}
@@ -1052,6 +1072,7 @@ function GameScreen({
 }
 
 function Header({
+  frame = 0,
   title = "SLOPS",
   subtitle,
 }: {
@@ -1059,14 +1080,17 @@ function Header({
   title?: string;
   subtitle: string;
 }) {
+  const color = derangedPalette[frame % derangedPalette.length] ?? theme.gold;
+  const ornament = frame % 2 === 0 ? "▣" : "▢";
+
   return (
     <box height={3} flexDirection="column" alignItems="center" justifyContent="center" flexShrink={0}>
       <text
-        fg={theme.gold}
+        fg={color}
         attributes={TextAttributes.BOLD}
         height={1}
         flexShrink={0}
-        content={`▣ ${title} ▣`}
+        content={`${ornament} ${title} ${ornament}`}
       />
       <text
         fg={theme.muted}
@@ -1310,7 +1334,7 @@ function Stat({
   return (
     <box
       border
-      borderColor={theme.borderDim}
+      borderColor={tone}
       backgroundColor={theme.panel}
       padding={1}
       flexGrow={1}
@@ -1352,7 +1376,7 @@ function StatsStrip({
   return (
     <box
       border
-      borderColor={theme.borderDim}
+      borderColor={theme.purple}
       backgroundColor={theme.panel}
       padding={1}
       height={3}
@@ -1389,7 +1413,9 @@ function Reel({
   height: number;
 }) {
   const width = compact ? 10 : 15;
-  const color = spinning ? reelPalette[(frame + index) % reelPalette.length] : theme.gold;
+  const color = reelPalette[(frame + index * 2) % reelPalette.length] ?? theme.gold;
+  const accent = reelPalette[(frame + index * 2 + 3) % reelPalette.length] ?? theme.cyan;
+  const background = reelBackdrops[(Math.floor(frame / 2) + index) % reelBackdrops.length] ?? theme.bg;
 
   return (
     <box
@@ -1397,7 +1423,7 @@ function Reel({
       height={height}
       border
       borderColor={color}
-      backgroundColor={theme.bg}
+      backgroundColor={background}
       flexDirection="column"
       alignItems="center"
       justifyContent="center"
@@ -1410,6 +1436,13 @@ function Reel({
         height={1}
         flexShrink={0}
         content={centerLine(label, width - 2)}
+        truncate
+      />
+      <text
+        fg={accent}
+        height={1}
+        flexShrink={0}
+        content={centerLine(reelSubline(index, frame), width - 2)}
         truncate
       />
     </box>
@@ -1441,7 +1474,7 @@ function CoinFlyby({
     );
   }
 
-  const chars = coinFlybyLine(frame, width, intense ? 10 : 6);
+  const chars = coinFlybyLine(frame, width, intense ? 22 : 14);
 
   return (
     <box height={1} flexShrink={0} flexDirection="row" overflow="hidden">
@@ -1474,7 +1507,7 @@ function HistoryPanel({
   return (
     <box
       border
-      borderColor={theme.borderDim}
+      borderColor={derangedPalette[Math.floor(frame / 2) % derangedPalette.length] ?? theme.borderDim}
       title="agent ticker"
       backgroundColor={theme.panel}
       padding={1}
@@ -1580,15 +1613,17 @@ function LeaderboardPanel({
   rows,
   lineWidth,
   title,
+  frame,
 }: {
   rows: string[];
   lineWidth: number;
   title: string;
+  frame: number;
 }) {
   return (
     <box
       border
-      borderColor={theme.borderDim}
+      borderColor={derangedPalette[(Math.floor(frame / 3) + 2) % derangedPalette.length] ?? theme.borderDim}
       title="leaderboard"
       backgroundColor={theme.panel}
       padding={1}
@@ -1841,9 +1876,23 @@ function nextAuthFocus(current: AuthFocus, mode: AuthMode): AuthFocus {
   return "username";
 }
 
+function reelSubline(index: number, frame: number) {
+  const labels = ["AGENT", "TOK", "PATCH", "YOLO", "SHIP", "DGEN", "RNG", "HOT"];
+  return labels[(Math.floor(frame / 2) + index * 2) % labels.length] ?? "RNG";
+}
+
 function scanline(frame: number) {
   const fills = ["░", "▒", "▓", "█"];
-  return `╔${fills[frame % fills.length].repeat(8)} SERVER-SIDE SPIN ${fills[(frame + 2) % fills.length].repeat(8)}╗`;
+  const calls = [
+    "SLOPS // SERVER-SIDE RNG",
+    "AGENTIC SLOT PIPELINE",
+    "SPACEBAR LIQUIDITY EVENT",
+    "CONTEXT WINDOW SWEATING",
+    "FAKE COIN LASER ROOM",
+    "PATCH APPLYING TO REALITY",
+  ];
+  const call = calls[Math.floor(frame / 5) % calls.length] ?? calls[0];
+  return `${fills[frame % fills.length].repeat(4)} ${call} ${fills[(frame + 2) % fills.length].repeat(4)}`;
 }
 
 function derangedGlyph(char: string, index: number, frame: number) {
@@ -1868,17 +1917,20 @@ function coinFlybyLine(frame: number, width: number, count: number) {
   const burst = Math.floor(frame / COIN_FLYBY_PERIOD);
   const phase = frame % COIN_FLYBY_PERIOD;
   const travelWidth = width + 18;
+  const glyphs = ["$", "¢", "◆", "✦", "*", "7", "!", "÷"];
 
   for (let index = 0; index < count; index += 1) {
-    const seed = pseudoRandomInt(burst * 97 + index * 41 + width * 13);
-    const speed = 2 + (seed % 3);
+    const seed = pseudoRandomInt(burst * 149 + index * 61 + width * 17);
+    const speed = 2 + (seed % 4);
     const progress = (phase * speed + seed) % travelWidth;
     const position = progress - 9;
-    const glyph = seed % 5 === 0 ? "o" : "$";
+    const glyph = glyphs[seed % glyphs.length] ?? "$";
 
+    putCoinChar(line, position - 3, seed % 2 === 0 ? "~" : ".");
     putCoinChar(line, position - 2, ".");
     putCoinChar(line, position - 1, ".");
     putCoinChar(line, position, glyph);
+    putCoinChar(line, position + 1, seed % 3 === 0 ? "^" : " ");
   }
 
   return line;
