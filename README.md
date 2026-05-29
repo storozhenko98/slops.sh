@@ -1,0 +1,2 @@
+# slops.sh
+Degens Rejoice 
