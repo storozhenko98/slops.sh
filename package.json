@@ -1,0 +1,39 @@
+{
+  "name": "slops.sh",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "bun run typecheck",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p packages/game/tsconfig.json && tsc --noEmit -p packages/cli/tsconfig.json",
+    "test": "bun test",
+    "ci": "bun run typecheck && bun run test && bun run build",
+    "cli:dev": "bun run --cwd packages/cli dev",
+    "cli:build": "bun run --cwd packages/cli build",
+    "cli:compile": "bun run --cwd packages/cli compile"
+  },
+  "dependencies": {
+    "@slops/game": "workspace:*",
+    "@supabase/supabase-js": "^2.106.2",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/node": "^25.0.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
