@@ -1,6 +1,8 @@
 export const STARTING_BALANCE = 1000;
 export const WAGER = 25;
 export const REEL_COUNT = 3;
+export const HALLUCINATION_MIN_COUNT = 2;
+export const HALLUCINATION_LOSS_RATE = 0.35;
 
 export const SYMBOLS = [
   { id: "7", label: "7", weight: 2 },
@@ -46,6 +48,14 @@ type RandomSource = () => number;
 
 const totalWeight = SYMBOLS.reduce((sum, symbol) => sum + symbol.weight, 0);
 const symbolLabels = new Map(SYMBOLS.map((symbol) => [symbol.id, symbol.label]));
+const PAYOUT_MULTIPLIERS = {
+  jackpot: 80,
+  "one-shot-green": 25,
+  "tests-passed": 14,
+  lgtm: 10,
+  triple: 8,
+  pair: 3,
+} as const satisfies Record<Exclude<SpinOutcome, "hallucination" | "context-full" | "miss">, number>;
 
 export function pickSymbol(random: RandomSource = Math.random): SlotSymbol {
   const roll = random() * totalWeight;
@@ -85,13 +95,14 @@ export function resolveSpin(
     return acc;
   }, {});
   const hasPair = Object.values(counts).some((count) => count === 2);
+  const hallucinationCount = counts.HALLUCINATION ?? 0;
 
   if (allSame && first === "CONTEXT") {
     return result(symbols, "context-full", wager, 0, balanceBefore, 0);
   }
 
-  if (symbols.includes("HALLUCINATION")) {
-    const loss = Math.max(wager, Math.floor(balanceBefore / 2));
+  if (hallucinationCount >= HALLUCINATION_MIN_COUNT) {
+    const loss = Math.max(wager, Math.floor(balanceBefore * HALLUCINATION_LOSS_RATE));
     return result(
       symbols,
       "hallucination",
@@ -103,27 +114,63 @@ export function resolveSpin(
   }
 
   if (allSame && first === "7") {
-    return withMultiplier(symbols, "jackpot", wager, 50, balanceBefore);
+    return withMultiplier(
+      symbols,
+      "jackpot",
+      wager,
+      PAYOUT_MULTIPLIERS.jackpot,
+      balanceBefore,
+    );
   }
 
   if (allSame && first === "SHIP") {
-    return withMultiplier(symbols, "one-shot-green", wager, 20, balanceBefore);
+    return withMultiplier(
+      symbols,
+      "one-shot-green",
+      wager,
+      PAYOUT_MULTIPLIERS["one-shot-green"],
+      balanceBefore,
+    );
   }
 
   if (allSame && first === "AI") {
-    return withMultiplier(symbols, "tests-passed", wager, 12, balanceBefore);
+    return withMultiplier(
+      symbols,
+      "tests-passed",
+      wager,
+      PAYOUT_MULTIPLIERS["tests-passed"],
+      balanceBefore,
+    );
   }
 
   if (allSame && first === "LGTM") {
-    return withMultiplier(symbols, "lgtm", wager, 8, balanceBefore);
+    return withMultiplier(
+      symbols,
+      "lgtm",
+      wager,
+      PAYOUT_MULTIPLIERS.lgtm,
+      balanceBefore,
+    );
   }
 
   if (allSame) {
-    return withMultiplier(symbols, "triple", wager, 6, balanceBefore);
+    return withMultiplier(
+      symbols,
+      "triple",
+      wager,
+      PAYOUT_MULTIPLIERS.triple,
+      balanceBefore,
+    );
   }
 
   if (hasPair) {
-    return withMultiplier(symbols, "pair", wager, 2, balanceBefore);
+    return withMultiplier(
+      symbols,
+      "pair",
+      wager,
+      PAYOUT_MULTIPLIERS.pair,
+      balanceBefore,
+    );
   }
 
   return result(
@@ -194,7 +241,7 @@ function messageFor(outcome: SpinOutcome) {
     case "pair":
       return "pair found. minor cope unlocked.";
     case "hallucination":
-      return "agent hallucinated. balance got cut in half.";
+      return "agent hallucinated twice. balance got stress-cut.";
     case "context-full":
       return "context window full. run is dead.";
     case "miss":

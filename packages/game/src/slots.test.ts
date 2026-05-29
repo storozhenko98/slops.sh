@@ -6,8 +6,8 @@ describe("resolveSpin", () => {
     const spin = resolveSpin(["7", "7", "7"], 1000);
 
     expect(spin.outcome).toBe("jackpot");
-    expect(spin.payout).toBe(WAGER * 50);
-    expect(spin.balanceAfter).toBe(2225);
+    expect(spin.payout).toBe(WAGER * 80);
+    expect(spin.balanceAfter).toBe(2975);
   });
 
   test("charges the wager on a miss", () => {
@@ -17,11 +17,26 @@ describe("resolveSpin", () => {
     expect(spin.balanceAfter).toBe(975);
   });
 
-  test("hallucination halves the active balance", () => {
+  test("single hallucination is just a normal miss", () => {
     const spin = resolveSpin(["AI", "HALLUCINATION", "PR"], 1000);
 
+    expect(spin.outcome).toBe("miss");
+    expect(spin.balanceAfter).toBe(975);
+  });
+
+  test("repeated hallucination stress-cuts the active balance", () => {
+    const spin = resolveSpin(["AI", "HALLUCINATION", "HALLUCINATION"], 1000);
+
     expect(spin.outcome).toBe("hallucination");
-    expect(spin.balanceAfter).toBe(500);
+    expect(spin.balanceAfter).toBe(650);
+  });
+
+  test("pairs pay enough to feel like a win", () => {
+    const spin = resolveSpin(["BUG", "BUG", "AI"], 1000);
+
+    expect(spin.outcome).toBe("pair");
+    expect(spin.payout).toBe(WAGER * 3);
+    expect(spin.balanceAfter).toBe(1050);
   });
 
   test("context triple busts the run", () => {
