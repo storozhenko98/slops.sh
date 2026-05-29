@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       throw new HttpError(
         400,
         "bad_request",
-        `Wager must be one of ${WAGER_STEPS.join(", ")} and no more than your balance.`,
+        `Wager must be one of ${WAGER_STEPS.join(", ")} or your full current balance.`,
       );
     }
 

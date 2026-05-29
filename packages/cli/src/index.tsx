@@ -522,6 +522,7 @@ function GameScreen({
   const [searching, setSearching] = useState(false);
   const [friendInput, setFriendInput] = useState("");
   const [wager, setWager] = useState(WAGER);
+  const [crashAlert, setCrashAlert] = useState<{ outcome: string; untilFrame: number } | null>(null);
   const [frame, setFrame] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const { width, height } = useTerminalDimensions();
@@ -534,6 +535,8 @@ function GameScreen({
   const token = session.token;
   const balance = run?.current_balance ?? 1000;
   const peak = run?.peak_balance ?? 1000;
+  const wagerLabel = formatWager(wager, balance);
+  const activeCrash = crashAlert && frame < crashAlert.untilFrame ? crashAlert.outcome : null;
   const outOfCoins = (run?.status ?? "active") === "busted" || balance < MIN_WAGER;
   const canSpin = !spinning && !outOfCoins && balance >= wager;
   const status = tickerPhraseAt(Math.floor(frame / AGENT_TICKER_FRAME_INTERVAL));
@@ -676,7 +679,7 @@ function GameScreen({
     if (isIncreaseWager(key)) {
       setWager((value) => {
         const next = nextWager(value, balance);
-        setMessage(`wager ${next.toLocaleString()}. press SPACE.`);
+        setMessage(`wager ${formatWager(next, balance)}. press SPACE.`);
         return next;
       });
       return;
@@ -685,7 +688,7 @@ function GameScreen({
     if (isDecreaseWager(key)) {
       setWager((value) => {
         const next = previousWager(value);
-        setMessage(`wager ${next.toLocaleString()}. press SPACE.`);
+        setMessage(`wager ${formatWager(next, balance)}. press SPACE.`);
         return next;
       });
       return;
@@ -837,6 +840,11 @@ function GameScreen({
 
     if (response.data.result) {
       setWager(response.data.result.wager);
+      setCrashAlert(
+        isCrashOutcome(response.data.result.outcome)
+          ? { outcome: response.data.result.outcome, untilFrame: frame + 36 }
+          : null,
+      );
       setReels(response.data.result.labels);
       setMessage(
         response.data.run.status === "busted"
@@ -875,6 +883,7 @@ function GameScreen({
     setReels(["BUG", "7", "AI"]);
     setSpinLog([]);
     setWager(WAGER);
+    setCrashAlert(null);
     setMessage("new run. press SPACE to spin.");
     await refreshLeaderboard(apiUrl, token, setLeaderboard, boardScope);
   }
@@ -956,7 +965,7 @@ function GameScreen({
           height={1}
           flexShrink={0}
           content={fixedLine(
-            `bal ${balance.toLocaleString()} · best ${peak.toLocaleString()} · wager ${wager}`,
+            `bal ${balance.toLocaleString()} · best ${peak.toLocaleString()} · wager ${wagerLabel}`,
             Math.max(20, width - 4),
           )}
           truncate
@@ -1023,20 +1032,24 @@ function GameScreen({
         <StatsStrip
           balance={balance.toLocaleString()}
           peak={peak.toLocaleString()}
-          wager={wager.toLocaleString()}
+          wager={wagerLabel}
           lineWidth={Math.max(20, width - 8)}
         />
       ) : (
         <box flexDirection="row" gap={1} flexShrink={0}>
           <Stat label="balance" value={balance.toLocaleString()} tone={theme.green} height={statHeight} />
           <Stat label="best" value={peak.toLocaleString()} tone={theme.gold} height={statHeight} />
-          <Stat label="wager" value={wager.toLocaleString()} tone={theme.cyan} height={statHeight} />
+          <Stat label="wager" value={wagerLabel} tone={theme.cyan} height={statHeight} />
         </box>
       )}
 
       <box
         border
-        borderColor={reelPalette[frame % reelPalette.length] ?? theme.border}
+        borderColor={
+          activeCrash
+            ? derangedPalette[(frame * 2) % derangedPalette.length] ?? theme.danger
+            : reelPalette[frame % reelPalette.length] ?? theme.border
+        }
         backgroundColor={reelBackdrops[Math.floor(frame / 2) % reelBackdrops.length] ?? theme.panel}
         height={slotHeight}
         padding={1}
@@ -1047,18 +1060,24 @@ function GameScreen({
         flexShrink={0}
         overflow="hidden"
       >
-        <text
-          fg={reelPalette[(frame + 2) % reelPalette.length] ?? theme.muted}
-          height={1}
-          flexShrink={0}
-          content={centerLine(scanline(frame), messageWidth)}
-          truncate
-        />
-        <CoinFlyby
-          frame={frame}
-          lineWidth={messageWidth}
-          intense={spinning || status.deranged === true || frame % 3 === 0}
-        />
+        {activeCrash ? (
+          <CrashBanner outcome={activeCrash} frame={frame} lineWidth={messageWidth} />
+        ) : (
+          <box height={2} flexShrink={0} flexDirection="column" overflow="hidden">
+            <text
+              fg={reelPalette[(frame + 2) % reelPalette.length] ?? theme.muted}
+              height={1}
+              flexShrink={0}
+              content={centerLine(scanline(frame), messageWidth)}
+              truncate
+            />
+            <CoinFlyby
+              frame={frame}
+              lineWidth={messageWidth}
+              intense={spinning || status.deranged === true || frame % 3 === 0}
+            />
+          </box>
+        )}
 
         <box
           flexDirection="row"
@@ -1490,6 +1509,51 @@ function Reel({
   );
 }
 
+function CrashBanner({
+  outcome,
+  frame,
+  lineWidth,
+}: {
+  outcome: string;
+  frame: number;
+  lineWidth: number;
+}) {
+  const width = Math.max(1, lineWidth);
+  const line = crashBannerLine(outcome, frame, width);
+  const wave = centerLine(crashWave(outcome, frame), width);
+
+  return (
+    <box height={2} flexShrink={0} flexDirection="column" overflow="hidden">
+      <box height={1} flexShrink={0} flexDirection="row" overflow="hidden">
+        {Array.from(line).map((char, index) => (
+          <text
+            key={`crash-banner-${index}`}
+            fg={char === " " ? theme.dim : derangedPalette[(index + frame * 2) % derangedPalette.length]}
+            attributes={TextAttributes.BOLD}
+            height={1}
+            width={1}
+            flexShrink={0}
+            content={char}
+          />
+        ))}
+      </box>
+      <box height={1} flexShrink={0} flexDirection="row" overflow="hidden">
+        {Array.from(wave).map((char, index) => (
+          <text
+            key={`crash-wave-${index}`}
+            fg={char === " " ? theme.dim : derangedPalette[(index + frame + 3) % derangedPalette.length]}
+            attributes={TextAttributes.BOLD}
+            height={1}
+            width={1}
+            flexShrink={0}
+            content={char}
+          />
+        ))}
+      </box>
+    </box>
+  );
+}
+
 function CoinFlyby({
   frame,
   lineWidth,
@@ -1709,7 +1773,7 @@ function GameHelp() {
     >
       <text fg={theme.gold} attributes={TextAttributes.BOLD} content="GAME HELP" />
       <text fg={theme.text} content="SPACE  spin if the run can afford the wager" />
-      <text fg={theme.text} content="+      raise wager: 25, 50, 100, 250, 500, 1000" />
+      <text fg={theme.text} content="+      raise wager: 25, 50, 100, 250, 500, 1000, all-in" />
       <text fg={theme.text} content="-      lower wager" />
       <text fg={theme.text} content="n      start a fresh 1,000 coin run" />
       <text fg={theme.text} content="r      refresh account/run state" />
@@ -1897,6 +1961,56 @@ function isIncreaseWager(key: { name: string; sequence: string }) {
 
 function isDecreaseWager(key: { name: string; sequence: string }) {
   return key.sequence === "-" || key.name === "-" || key.name === "minus";
+}
+
+function formatWager(wager: number, balance: number) {
+  const amount = wager.toLocaleString();
+  return balance >= MIN_WAGER && wager === balance ? `${amount} ALL IN` : amount;
+}
+
+function isCrashOutcome(outcome: string) {
+  return [
+    "segfault",
+    "memory-leak",
+    "rate-limit",
+    "hallucination",
+    "context-leak",
+    "dependency-hole",
+  ].includes(outcome);
+}
+
+function crashTitle(outcome: string) {
+  switch (outcome) {
+    case "segfault":
+      return "S E G   F A U L T";
+    case "memory-leak":
+      return "M E M   L E A K";
+    case "rate-limit":
+      return "4 2 9   L I M I T";
+    case "hallucination":
+      return "H A L   D R O P";
+    case "context-leak":
+      return "C T X   L E A K";
+    case "dependency-hole":
+      return "D E P   H O L E";
+    default:
+      return "B A D   C O M B O";
+  }
+}
+
+function crashBannerLine(outcome: string, frame: number, width: number) {
+  const shake = ["", "  ", "    ", " "][frame % 4] ?? "";
+  const label = `${shake}${crashTitle(outcome)}${shake}`;
+  return fixedLine(centerLine(label, width), width);
+}
+
+function crashWave(outcome: string, frame: number) {
+  const marks = outcome === "segfault"
+    ? ["▄", "▀", "█", "▓", "▒", "░"]
+    : ["_", "-", "~", "^", "~", "-"];
+  return Array.from(crashTitle(outcome), (char, index) =>
+    char === " " ? " " : marks[(index + frame) % marks.length] ?? "~",
+  ).join("");
 }
 
 function formatSpinLog(result: SpinResponse["result"]) {

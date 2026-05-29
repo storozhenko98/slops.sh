@@ -2,7 +2,7 @@ export const STARTING_BALANCE = 1000;
 export const WAGER = 25;
 export const WAGER_STEPS = [25, 50, 100, 250, 500, 1000] as const;
 export const MIN_WAGER = WAGER_STEPS[0];
-export const MAX_WAGER = WAGER_STEPS[WAGER_STEPS.length - 1];
+export const BASE_MAX_WAGER = WAGER_STEPS[WAGER_STEPS.length - 1];
 export const REEL_COUNT = 3;
 export const HALLUCINATION_MIN_COUNT = 2;
 export const HALLUCINATION_LOSS_RATE = 0.6;
@@ -10,6 +10,11 @@ export const CONTEXT_LEAK_LOSS_RATE = 0.45;
 export const BUG_TAX_LOSS_RATE = 0.25;
 export const TODO_LOOP_LOSS_RATE = 0.22;
 export const DEPENDENCY_HOLE_LOSS_RATE = 0.4;
+export const SEGFAULT_LOSS_RATE = 0.8;
+export const MEMORY_LEAK_MIN_LOSS_RATE = 0.22;
+export const MEMORY_LEAK_MAX_LOSS_RATE = 0.58;
+export const RATE_LIMIT_MIN_LOSS_RATE = 0.18;
+export const RATE_LIMIT_MAX_LOSS_RATE = 0.52;
 
 export const SYMBOLS = [
   { id: "7", label: "7", weight: 2 },
@@ -24,6 +29,7 @@ export const SYMBOLS = [
   { id: "MERGE", label: "MERGE", weight: 5 },
   { id: "HALLUCINATION", label: "HAL", weight: 3 },
   { id: "CONTEXT", label: "CTX", weight: 2 },
+  { id: "SEGFAULT", label: "SEG", weight: 2 },
 ] as const;
 
 export type SlotSymbol = (typeof SYMBOLS)[number]["id"];
@@ -47,6 +53,9 @@ export type SpinOutcome =
   | "bug-tax"
   | "todo-loop"
   | "dependency-hole"
+  | "segfault"
+  | "memory-leak"
+  | "rate-limit"
   | "context-full"
   | "miss";
 
@@ -67,50 +76,70 @@ type RandomSource = () => number;
 const totalWeight = SYMBOLS.reduce((sum, symbol) => sum + symbol.weight, 0);
 const symbolLabels = new Map(SYMBOLS.map((symbol) => [symbol.id, symbol.label]));
 const PAYOUT_MULTIPLIERS = {
-  jackpot: 2500,
-  "one-shot-green": 650,
-  "tests-passed": 300,
-  "merge-party": 150,
-  "token-pump": 40,
-  "vibe-jackpot": 75,
-  "seven-pair": 110,
-  "seven-spark": 6,
-  "hot-pair": 22,
-  "npm-pair": 16,
-  lgtm: 180,
-  triple: 90,
-  pair: 5,
+  jackpot: 3000,
+  "one-shot-green": 800,
+  "tests-passed": 400,
+  "merge-party": 200,
+  "token-pump": 55,
+  "vibe-jackpot": 110,
+  "seven-pair": 150,
+  "seven-spark": 8,
+  "hot-pair": 30,
+  "npm-pair": 22,
+  lgtm: 250,
+  triple: 120,
+  pair: 6,
 } as const satisfies Record<
   Exclude<
     SpinOutcome,
-    "hallucination" | "context-leak" | "bug-tax" | "todo-loop" | "dependency-hole" | "context-full" | "miss"
+    | "hallucination"
+    | "context-leak"
+    | "bug-tax"
+    | "todo-loop"
+    | "dependency-hole"
+    | "segfault"
+    | "memory-leak"
+    | "rate-limit"
+    | "context-full"
+    | "miss"
   >,
   number
 >;
 
 export function playableWagerSteps(balance = Number.POSITIVE_INFINITY): number[] {
-  const maxPlayable = Math.max(MIN_WAGER, Math.min(MAX_WAGER, Math.floor(balance)));
-  return WAGER_STEPS.filter((step) => step <= maxPlayable);
+  if (!Number.isFinite(balance)) {
+    return [...WAGER_STEPS];
+  }
+
+  const maxPlayable = Math.floor(balance);
+  const steps: number[] = WAGER_STEPS.filter((step) => step <= maxPlayable);
+
+  if (maxPlayable >= MIN_WAGER && !steps.includes(maxPlayable)) {
+    steps.push(maxPlayable);
+  }
+
+  return steps;
 }
 
-export function normalizeWager(value = WAGER, balance = Number.POSITIVE_INFINITY) {
+export function normalizeWager(value = WAGER, balance = Number.POSITIVE_INFINITY): number {
   const numeric = Number.isFinite(value) ? Math.floor(value) : WAGER;
-  const maxPlayable = playableWagerSteps(balance).at(-1) ?? MIN_WAGER;
+  const steps = playableWagerSteps(balance);
+  const maxPlayable = steps.at(-1) ?? MIN_WAGER;
   const capped = Math.min(Math.max(numeric, MIN_WAGER), maxPlayable);
-  return [...WAGER_STEPS].reverse().find((step) => step <= capped) ?? MIN_WAGER;
+  return [...steps].reverse().find((step) => step <= capped) ?? MIN_WAGER;
 }
 
-export function nextWager(current: number, balance = Number.POSITIVE_INFINITY) {
+export function nextWager(current: number, balance = Number.POSITIVE_INFINITY): number {
   const steps = playableWagerSteps(balance);
   return steps.find((step) => step > current) ?? steps[steps.length - 1] ?? MIN_WAGER;
 }
 
-export function previousWager(current: number) {
+export function previousWager(current: number): number {
   return [...WAGER_STEPS].reverse().find((step) => step < current) ?? MIN_WAGER;
 }
 
 export function isAllowedWager(value: number, balance = Number.POSITIVE_INFINITY) {
-  return Number.isInteger(value) && WAGER_STEPS.some((step) => step === value) && value <= balance;
+  return Number.isInteger(value) && playableWagerSteps(balance).some((step) => step === value);
 }
 
 export function pickSymbol(random: RandomSource = Math.random): SlotSymbol {
@@ -135,6 +164,7 @@ export function resolveSpin(
   symbols: SlotSymbol[],
   balanceBefore: number,
   wager = WAGER,
+  random: RandomSource = Math.random,
 ): SpinResult {
   if (symbols.length !== REEL_COUNT) {
     throw new Error(`expected ${REEL_COUNT} symbols`);
@@ -153,9 +183,20 @@ export function resolveSpin(
   const hasPair = Object.values(counts).some((count) => count === 2);
   const hallucinationCount = counts.HALLUCINATION ?? 0;
   const contextCount = counts.CONTEXT ?? 0;
+  const segfaultCount = counts.SEGFAULT ?? 0;
 
   if (allSame && first === "CONTEXT") {
     return result(symbols, "context-full", wager, 0, balanceBefore, 0);
+  }
+
+  if (segfaultCount >= 2 || containsExactSymbols(symbols, ["SEGFAULT", "BUG", "CONTEXT"])) {
+    return withLoss(
+      symbols,
+      "segfault",
+      wager,
+      Math.max(wager * 12, Math.floor(balanceBefore * SEGFAULT_LOSS_RATE)),
+      balanceBefore,
+    );
   }
 
   if (hallucinationCount >= HALLUCINATION_MIN_COUNT) {
@@ -163,7 +204,7 @@ export function resolveSpin(
       symbols,
       "hallucination",
       wager,
-      Math.max(wager * 10, Math.floor(balanceBefore * HALLUCINATION_LOSS_RATE)),
+      varianceLoss(balanceBefore, wager, HALLUCINATION_LOSS_RATE, 0.82, random),
       balanceBefore,
     );
   }
@@ -223,7 +264,17 @@ export function resolveSpin(
       symbols,
       "context-leak",
       wager,
-      Math.max(wager * 8, Math.floor(balanceBefore * CONTEXT_LEAK_LOSS_RATE)),
+      varianceLoss(balanceBefore, wager, CONTEXT_LEAK_LOSS_RATE, 0.72, random),
+      balanceBefore,
+    );
+  }
+
+  if (containsExactSymbols(symbols, ["NPM", "TOK", "CONTEXT"])) {
+    return withLoss(
+      symbols,
+      "rate-limit",
+      wager,
+      varianceLoss(balanceBefore, wager, RATE_LIMIT_MIN_LOSS_RATE, RATE_LIMIT_MAX_LOSS_RATE, random),
       balanceBefore,
     );
   }
@@ -233,7 +284,17 @@ export function resolveSpin(
       symbols,
       "dependency-hole",
       wager,
-      Math.max(wager * 10, Math.floor(balanceBefore * DEPENDENCY_HOLE_LOSS_RATE)),
+      varianceLoss(balanceBefore, wager, DEPENDENCY_HOLE_LOSS_RATE, 0.68, random),
+      balanceBefore,
+    );
+  }
+
+  if (segfaultCount === 1) {
+    return withLoss(
+      symbols,
+      "memory-leak",
+      wager,
+      varianceLoss(balanceBefore, wager, MEMORY_LEAK_MIN_LOSS_RATE, MEMORY_LEAK_MAX_LOSS_RATE, random),
       balanceBefore,
     );
   }
@@ -243,7 +304,7 @@ export function resolveSpin(
       symbols,
       "bug-tax",
       wager,
-      Math.max(wager * 4, Math.floor(balanceBefore * BUG_TAX_LOSS_RATE)),
+      varianceLoss(balanceBefore, wager, BUG_TAX_LOSS_RATE, 0.5, random),
       balanceBefore,
     );
   }
@@ -253,7 +314,7 @@ export function resolveSpin(
       symbols,
       "todo-loop",
       wager,
-      Math.max(wager * 4, Math.floor(balanceBefore * TODO_LOOP_LOSS_RATE)),
+      varianceLoss(balanceBefore, wager, TODO_LOOP_LOSS_RATE, 0.46, random),
       balanceBefore,
     );
   }
@@ -446,11 +507,28 @@ function messageFor(outcome: SpinOutcome) {
       return "double TODO. scope creep ate the floor.";
     case "dependency-hole":
       return "BUG TODO NPM. dependency hole liquidation event.";
+    case "segfault":
+      return "SEG FAULT. 80 percent wiped. beautiful disaster.";
+    case "memory-leak":
+      return "SEG slipped in. random memory leak tax.";
+    case "rate-limit":
+      return "NPM TOK CTX. rate limit ate a random chunk.";
     case "context-full":
       return "context window full. run is dead.";
     case "miss":
       return "nothing happened, which is on brand.";
   }
+}
+
+function varianceLoss(
+  balanceBefore: number,
+  wager: number,
+  minRate: number,
+  maxRate: number,
+  random: RandomSource,
+) {
+  const rate = minRate + random() * (maxRate - minRate);
+  return Math.max(wager * 4, Math.floor(balanceBefore * rate));
 }
 
 function containsExactSymbols(symbols: SlotSymbol[], combo: SlotSymbol[]) {
