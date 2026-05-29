@@ -31,6 +31,11 @@ if [ "$asset" = "slops-linux-arm64" ]; then
   exit 1
 fi
 
+if [ "$asset" = "slops-macos-x64" ]; then
+  echo "macOS Intel builds are not published; use Apple Silicon macOS or linux x64" >&2
+  exit 1
+fi
+
 url="https://github.com/$repo/releases/download/$tag/$asset"
 checksum_url="$url.sha256"
 tmp="$(mktemp "\${TMPDIR:-/tmp}/slops.XXXXXX")"

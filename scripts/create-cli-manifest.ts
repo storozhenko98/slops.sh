@@ -12,7 +12,6 @@ if (!version || !tag || !commit || !assetDir || !outputPath) {
 
 const assetNames = [
   "slops-linux-x64",
-  "slops-macos-x64",
   "slops-macos-arm64",
 ] as const;
 

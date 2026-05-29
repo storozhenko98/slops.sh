@@ -43,10 +43,10 @@ in a sudo-owned global path.
 curl -fsSL https://slops.sh/install.sh | bash
 ```
 
-The installer downloads the latest GitHub Release binary for macOS or Linux,
-verifies the published SHA-256 checksum when local checksum tooling is
-available, and writes `slops` to `~/.local/bin` by default. Override the target
-directory with `SLOPS_INSTALL_DIR=/some/bin`.
+The installer downloads the latest GitHub Release binary for Apple Silicon
+macOS or Linux x64, verifies the published SHA-256 checksum when local checksum
+tooling is available, and writes `slops` to `~/.local/bin` by default. Override
+the target directory with `SLOPS_INSTALL_DIR=/some/bin`.
 
 On startup, release builds check the rolling `latest` release manifest. If a
 newer binary is available, the CLI asks whether to update before launching the
@@ -61,9 +61,9 @@ Vercel project env.
 
 ## Release flow
 
-Pushes to `main` run tests, build the web app, compile the OpenTUI CLI on Linux
-and macOS runners, and replace the GitHub `latest` release with fresh artifacts
-plus `slops-version.json`.
+Pushes to `main` run tests, build the web app, compile the OpenTUI CLI for
+Linux x64 and Apple Silicon macOS, and replace the GitHub `latest` release with
+fresh artifacts plus `slops-version.json`.
 
 Pushing a version tag such as `v0.2.0` runs the same builds and creates an
 immutable GitHub Release for that tag.

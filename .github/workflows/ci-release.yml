@@ -36,8 +36,6 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: slops-linux-x64
-          - os: macos-13
-            artifact: slops-macos-x64
           - os: macos-14
             artifact: slops-macos-arm64
     runs-on: ${{ matrix.os }}

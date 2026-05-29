@@ -29,7 +29,7 @@ export default function Home() {
             <div className="commands" aria-label="Install commands">
               <code className="command">
                 curl -fsSL https://slops.sh/install.sh | bash{" "}
-                <span>macOS · linux</span>
+                <span>macOS arm64 · linux x64</span>
               </code>
               <code className="command">
                 ~/.local/bin/slops <span>launch</span>
