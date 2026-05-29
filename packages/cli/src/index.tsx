@@ -1,7 +1,15 @@
 #!/usr/bin/env bun
 import { createCliRenderer, TextAttributes } from "@opentui/core";
 import { createRoot, useKeyboard, useTerminalDimensions } from "@opentui/react";
-import { SYMBOLS, WAGER, type SlotSymbol } from "@slops/game";
+import {
+  MIN_WAGER,
+  SYMBOLS,
+  WAGER,
+  nextWager,
+  normalizeWager,
+  previousWager,
+  type SlotSymbol,
+} from "@slops/game";
 import { useEffect, useRef, useState } from "react";
 import { apiRequest, type Session } from "./api";
 import { printHelp, parseOptions } from "./commands";
@@ -37,6 +45,7 @@ type SpinResponse = {
   result?: {
     labels: string[];
     outcome: string;
+    wager: number;
     message: string;
     payout: number;
     balanceAfter: number;
@@ -512,6 +521,7 @@ function GameScreen({
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [friendInput, setFriendInput] = useState("");
+  const [wager, setWager] = useState(WAGER);
   const [frame, setFrame] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const { width, height } = useTerminalDimensions();
@@ -524,8 +534,8 @@ function GameScreen({
   const token = session.token;
   const balance = run?.current_balance ?? 1000;
   const peak = run?.peak_balance ?? 1000;
-  const outOfCoins = (run?.status ?? "active") === "busted" || balance < WAGER;
-  const canSpin = !spinning && !outOfCoins;
+  const outOfCoins = (run?.status ?? "active") === "busted" || balance < MIN_WAGER;
+  const canSpin = !spinning && !outOfCoins && balance >= wager;
   const status = tickerPhraseAt(Math.floor(frame / AGENT_TICKER_FRAME_INTERVAL));
   const detailRows = dense ? 3 : HISTORY_ROWS;
   const detailLineWidth = Math.max(
@@ -561,10 +571,12 @@ function GameScreen({
   );
   const displayMessage = outOfCoins && !spinning
     ? "out of fake coins. press n for a new run."
+    : !spinning && balance < wager
+      ? "lower wager with - or press n for a new run."
     : message;
   const controls = outOfCoins
     ? "n new run · l leaderboard · h help · q quit"
-    : "SPACE spin · n new run · h help · l leaderboard";
+    : "SPACE spin · +/- wager · n new run · h help · l leaderboard";
 
   useEffect(() => {
     const timer = setInterval(() => setFrame((value) => value + 1), 140);
@@ -587,6 +599,10 @@ function GameScreen({
   useEffect(() => {
     setBoardPage(0);
   }, [boardScope, search]);
+
+  useEffect(() => {
+    setWager((value) => normalizeWager(value, balance));
+  }, [balance]);
 
   useEffect(() => {
     if (!spinning) {
@@ -654,6 +670,24 @@ function GameScreen({
 
     if (key.name === "n") {
       void startNewRun();
+      return;
+    }
+
+    if (isIncreaseWager(key)) {
+      setWager((value) => {
+        const next = nextWager(value, balance);
+        setMessage(`wager ${next.toLocaleString()}. press SPACE.`);
+        return next;
+      });
+      return;
+    }
+
+    if (isDecreaseWager(key)) {
+      setWager((value) => {
+        const next = previousWager(value);
+        setMessage(`wager ${next.toLocaleString()}. press SPACE.`);
+        return next;
+      });
       return;
     }
 
@@ -771,7 +805,11 @@ function GameScreen({
 
   async function spin() {
     if (!canSpin) {
-      setMessage("out of fake coins. press n for a new run.");
+      setMessage(
+        outOfCoins
+          ? "out of fake coins. press n for a new run."
+          : "wager is above balance. press - to lower it.",
+      );
       return;
     }
 
@@ -784,6 +822,7 @@ function GameScreen({
       body: {
         runId: run?.id,
         nonce: crypto.randomUUID(),
+        wager,
       },
     });
 
@@ -797,6 +836,7 @@ function GameScreen({
     setRun(response.data.run);
 
     if (response.data.result) {
+      setWager(response.data.result.wager);
       setReels(response.data.result.labels);
       setMessage(
         response.data.run.status === "busted"
@@ -805,7 +845,7 @@ function GameScreen({
       );
       setSpinLog((log) =>
         [
-          `${response.data.result?.outcome ?? "spin"} · ${response.data.result?.balanceAfter.toLocaleString()}`,
+          formatSpinLog(response.data.result),
           ...log,
         ].slice(0, HISTORY_ROWS),
       );
@@ -834,6 +874,7 @@ function GameScreen({
     setRun(response.data.run);
     setReels(["BUG", "7", "AI"]);
     setSpinLog([]);
+    setWager(WAGER);
     setMessage("new run. press SPACE to spin.");
     await refreshLeaderboard(apiUrl, token, setLeaderboard, boardScope);
   }
@@ -915,7 +956,7 @@ function GameScreen({
           height={1}
           flexShrink={0}
           content={fixedLine(
-            `bal ${balance.toLocaleString()} · best ${peak.toLocaleString()} · wager ${WAGER}`,
+            `bal ${balance.toLocaleString()} · best ${peak.toLocaleString()} · wager ${wager}`,
             Math.max(20, width - 4),
           )}
           truncate
@@ -982,14 +1023,14 @@ function GameScreen({
         <StatsStrip
           balance={balance.toLocaleString()}
           peak={peak.toLocaleString()}
-          wager={WAGER.toLocaleString()}
+          wager={wager.toLocaleString()}
           lineWidth={Math.max(20, width - 8)}
         />
       ) : (
         <box flexDirection="row" gap={1} flexShrink={0}>
           <Stat label="balance" value={balance.toLocaleString()} tone={theme.green} height={statHeight} />
           <Stat label="best" value={peak.toLocaleString()} tone={theme.gold} height={statHeight} />
-          <Stat label="wager" value={WAGER.toLocaleString()} tone={theme.cyan} height={statHeight} />
+          <Stat label="wager" value={wager.toLocaleString()} tone={theme.cyan} height={statHeight} />
         </box>
       )}
 
@@ -1668,6 +1709,8 @@ function GameHelp() {
     >
       <text fg={theme.gold} attributes={TextAttributes.BOLD} content="GAME HELP" />
       <text fg={theme.text} content="SPACE  spin if the run can afford the wager" />
+      <text fg={theme.text} content="+      raise wager: 25, 50, 100, 250, 500, 1000" />
+      <text fg={theme.text} content="-      lower wager" />
       <text fg={theme.text} content="n      start a fresh 1,000 coin run" />
       <text fg={theme.text} content="r      refresh account/run state" />
       <text fg={theme.text} content="l      open the global leaderboard" />
@@ -1846,6 +1889,23 @@ function normalizeApiUrl(value: string) {
 
 function isEnter(key: { name: string }) {
   return key.name === "return" || key.name === "enter";
+}
+
+function isIncreaseWager(key: { name: string; sequence: string }) {
+  return key.sequence === "+" || key.name === "+" || key.name === "=";
+}
+
+function isDecreaseWager(key: { name: string; sequence: string }) {
+  return key.sequence === "-" || key.name === "-" || key.name === "minus";
+}
+
+function formatSpinLog(result: SpinResponse["result"]) {
+  if (!result) {
+    return "spin";
+  }
+
+  const payout = result.payout > 0 ? `+${result.payout.toLocaleString()}` : "loss";
+  return `${result.outcome} ${payout} · w${result.wager.toLocaleString()} · ${result.balanceAfter.toLocaleString()}`;
 }
 
 function nextAuthFocus(current: AuthFocus, mode: AuthMode): AuthFocus {

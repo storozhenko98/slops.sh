@@ -34,6 +34,7 @@ export const deleteAccountSchema = z.object({
 export const spinSchema = z.object({
   runId: z.uuid().optional(),
   nonce: z.string().min(8).max(128),
+  wager: z.int().positive().optional(),
 });
 
 export const runSchema = z.object({

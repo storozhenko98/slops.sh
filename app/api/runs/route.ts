@@ -1,4 +1,4 @@
-import { STARTING_BALANCE, WAGER } from "@slops/game";
+import { MIN_WAGER, STARTING_BALANCE } from "@slops/game";
 import type { NextRequest } from "next/server";
 import { runSchema } from "@/lib/schemas";
 import { badRequest, handleHttpError, json, requireUser } from "@/lib/http";
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       const { error: endError } = await supabase
         .from("runs")
         .update({
-          status: activeRun.current_balance >= WAGER ? "cashed_out" : "busted",
+          status: activeRun.current_balance >= MIN_WAGER ? "cashed_out" : "busted",
           ended_at: new Date().toISOString(),
         })
         .eq("id", activeRun.id);

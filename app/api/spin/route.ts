@@ -1,13 +1,16 @@
 import {
+  MIN_WAGER,
   STARTING_BALANCE,
   WAGER,
+  WAGER_STEPS,
+  isAllowedWager,
   resolveSpin,
   spinSymbols,
   type SlotSymbol,
 } from "@slops/game";
 import type { NextRequest } from "next/server";
 import { spinSchema } from "@/lib/schemas";
-import { badRequest, handleHttpError, json, requireUser } from "@/lib/http";
+import { HttpError, badRequest, handleHttpError, json, requireUser } from "@/lib/http";
 import { createSupabaseAdminClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -31,7 +34,10 @@ export async function POST(request: NextRequest) {
       return json({ run, spin: previousSpin, idempotent: true });
     }
 
-    if (run.current_balance < WAGER) {
+    const balanceBefore = Number(run.current_balance);
+    const wager = body.wager ?? WAGER;
+
+    if (balanceBefore < MIN_WAGER) {
       const { data: bustedRun, error } = await supabase
         .from("runs")
         .update({
@@ -50,13 +56,21 @@ export async function POST(request: NextRequest) {
       return json({ run: bustedRun, spin: null, busted: true });
     }
 
+    if (!isAllowedWager(wager, balanceBefore)) {
+      throw new HttpError(
+        400,
+        "bad_request",
+        `Wager must be one of ${WAGER_STEPS.join(", ")} and no more than your balance.`,
+      );
+    }
+
     const symbols = spinSymbols(cryptoRandom);
     const result = resolveSpin(
       symbols,
-      Number(run.current_balance),
-      WAGER,
+      balanceBefore,
+      wager,
     );
-    const status = result.busted || result.balanceAfter < WAGER ? "busted" : "active";
+    const status = result.busted || result.balanceAfter < MIN_WAGER ? "busted" : "active";
     const peakBalance = Math.max(Number(run.peak_balance), result.balanceAfter);
 
     const { data: spin, error: spinError } = await supabase
