@@ -49,11 +49,11 @@ type RandomSource = () => number;
 const totalWeight = SYMBOLS.reduce((sum, symbol) => sum + symbol.weight, 0);
 const symbolLabels = new Map(SYMBOLS.map((symbol) => [symbol.id, symbol.label]));
 const PAYOUT_MULTIPLIERS = {
-  jackpot: 80,
-  "one-shot-green": 25,
-  "tests-passed": 14,
-  lgtm: 10,
-  triple: 8,
+  jackpot: 800,
+  "one-shot-green": 125,
+  "tests-passed": 60,
+  lgtm: 30,
+  triple: 20,
   pair: 3,
 } as const satisfies Record<Exclude<SpinOutcome, "hallucination" | "context-full" | "miss">, number>;
 
@@ -235,11 +235,11 @@ function messageFor(outcome: SpinOutcome) {
     case "tests-passed":
       return "tests passed. suspicious.";
     case "lgtm":
-      return "LGTM. small win, large confidence.";
+      return "LGTM. confidence pump detected.";
     case "triple":
-      return "three of a kind. agent keeps its job.";
+      return "three of a kind. balance got irresponsible.";
     case "pair":
-      return "pair found. minor cope unlocked.";
+      return "pair found. line goes up.";
     case "hallucination":
       return "agent hallucinated twice. balance got stress-cut.";
     case "context-full":

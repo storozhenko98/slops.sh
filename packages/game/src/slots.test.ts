@@ -6,8 +6,8 @@ describe("resolveSpin", () => {
     const spin = resolveSpin(["7", "7", "7"], 1000);
 
     expect(spin.outcome).toBe("jackpot");
-    expect(spin.payout).toBe(WAGER * 80);
-    expect(spin.balanceAfter).toBe(2975);
+    expect(spin.payout).toBe(WAGER * 800);
+    expect(spin.balanceAfter).toBe(20975);
   });
 
   test("charges the wager on a miss", () => {
