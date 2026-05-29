@@ -1,6 +1,15 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { access, chmod, mkdir, rename, rm } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  lstat,
+  mkdir,
+  readlink,
+  rename,
+  rm,
+  symlink,
+} from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
@@ -122,8 +131,10 @@ async function installUpdate(manifest: ReleaseManifest, asset: ReleaseAsset) {
     }
   }
 
-  const primaryTarget = process.env.SLOPS_UPDATE_TARGET || process.execPath;
-  const fallbackTarget = join(homeBinDir(), "slops");
+  const primaryTarget = await resolveUpdateTarget(
+    process.env.SLOPS_UPDATE_TARGET || process.execPath,
+  );
+  const fallbackTarget = join(slopsHomeDir(), "bin", "slops");
   const target = await canReplace(primaryTarget) ? primaryTarget : fallbackTarget;
   const temp = `${target}.download-${process.pid}`;
 
@@ -133,12 +144,29 @@ async function installUpdate(manifest: ReleaseManifest, asset: ReleaseAsset) {
 
   try {
     await rename(temp, target);
+    if (target === fallbackTarget) {
+      await linkHomeCommand(target);
+    }
   } catch (error) {
     await rm(temp, { force: true }).catch(() => undefined);
     throw error;
   }
 
   return target;
+}
+
+async function resolveUpdateTarget(path: string) {
+  try {
+    const stats = await lstat(path);
+    if (!stats.isSymbolicLink()) {
+      return path;
+    }
+
+    const target = await readlink(path);
+    return target.startsWith("/") ? target : join(dirname(path), target);
+  } catch {
+    return path;
+  }
 }
 
 async function canReplace(path: string) {
@@ -172,6 +200,28 @@ function platformKey() {
 function homeBinDir() {
   const home = process.env.HOME || process.cwd();
   return join(home, ".local", "bin");
+}
+
+function slopsHomeDir() {
+  const home = process.env.HOME || process.cwd();
+  return process.env.SLOPS_HOME || join(home, ".local", "share", "slops");
+}
+
+async function linkHomeCommand(target: string) {
+  const linkPath = join(homeBinDir(), "slops");
+  await mkdir(dirname(linkPath), { recursive: true, mode: 0o755 });
+
+  try {
+    const stats = await lstat(linkPath);
+    if (stats.isDirectory() && !stats.isSymbolicLink()) {
+      return;
+    }
+  } catch {
+    // Missing link is the expected first-update path.
+  }
+
+  await rm(linkPath, { force: true });
+  await symlink(target, linkPath);
 }
 
 async function ask(prompt: string) {

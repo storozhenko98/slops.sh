@@ -45,8 +45,10 @@ curl -fsSL https://slops.sh/install.sh | bash
 
 The installer downloads the latest GitHub Release binary for Apple Silicon
 macOS or Linux x64, verifies the published SHA-256 checksum when local checksum
-tooling is available, and writes `slops` to `~/.local/bin` by default. Override
-the target directory with `SLOPS_INSTALL_DIR=/some/bin`.
+tooling is available, writes the binary under `~/.local/share/slops`, and
+symlinks `slops` into `~/.local/bin` by default. Override the symlink directory
+with `SLOPS_INSTALL_DIR=/some/bin` or the app payload directory with
+`SLOPS_HOME=/some/slops-home`.
 
 On startup, release builds check the rolling `latest` release manifest. If a
 newer binary is available, the CLI asks whether to update before launching the

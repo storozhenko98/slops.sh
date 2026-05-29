@@ -1,3 +1,5 @@
+import { CopyCommand } from "./copy-command";
+
 const leaderboard = [
   ["alice", "12,400"],
   ["you", "7,900"],
@@ -27,13 +29,16 @@ export default function Home() {
               &quot;planning edits&quot; and &quot;applying patch&quot;.
             </p>
             <div className="commands" aria-label="Install commands">
-              <code className="command">
-                curl -fsSL https://slops.sh/install.sh | bash{" "}
-                <span>macOS arm64 · linux x64</span>
-              </code>
-              <code className="command">
-                ~/.local/bin/slops <span>launch</span>
-              </code>
+              <CopyCommand
+                command="curl -fsSL https://slops.sh/install.sh | bash"
+                meta="copy install"
+                ariaLabel="Copy slops install command"
+              />
+              <CopyCommand
+                command="slops"
+                meta="copy launch"
+                ariaLabel="Copy slops launch command"
+              />
             </div>
           </div>
 
@@ -71,8 +76,8 @@ export default function Home() {
               <div>
                 {leaderboard.map(([name, score]) => (
                   <div className="command" key={name}>
-                    {name}
-                    <span>{score}</span>
+                    <span className="command-text">{name}</span>
+                    <span className="command-meta">{score}</span>
                   </div>
                 ))}
               </div>

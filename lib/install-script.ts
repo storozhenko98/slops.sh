@@ -4,7 +4,10 @@ set -euo pipefail
 repo="storozhenko98/slops.sh"
 tag="latest"
 install_dir="\${SLOPS_INSTALL_DIR:-$HOME/.local/bin}"
-bin_path="$install_dir/slops"
+slops_home="\${SLOPS_HOME:-$HOME/.local/share/slops}"
+app_bin_dir="$slops_home/bin"
+app_bin_path="$app_bin_dir/slops"
+link_path="$install_dir/slops"
 
 case "$(uname -s)" in
   Darwin) os="macos" ;;
@@ -63,17 +66,26 @@ else
   echo "warning: no sha256 checker found; skipping checksum verification" >&2
 fi
 
-mkdir -p "$install_dir"
+mkdir -p "$app_bin_dir" "$install_dir"
 chmod +x "$tmp"
-mv "$tmp" "$bin_path"
+mv "$tmp" "$app_bin_path"
 
-echo "installed slops to $bin_path"
+if [ -d "$link_path" ] && [ ! -L "$link_path" ]; then
+  echo "$link_path is a directory; cannot create slops symlink" >&2
+  exit 1
+fi
+
+rm -f "$link_path"
+ln -s "$app_bin_path" "$link_path"
+
+echo "installed slops to $app_bin_path"
+echo "linked $link_path -> $app_bin_path"
 
 case ":$PATH:" in
   *":$install_dir:"*) ;;
   *)
-    echo "add $install_dir to PATH, or run:"
-    echo "  $bin_path"
+    echo "add $install_dir to PATH, then run:"
+    echo "  slops"
     ;;
 esac
 `;
